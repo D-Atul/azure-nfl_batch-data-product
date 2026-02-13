@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.env/
+.envrc
+
+# IDE
+.vscode/
+.idea/
+
+# Spark / temp files
+*.tmp
+
+# Ignore local downloaded metric/parquet copies (if any)
+*.parquet
+
+# Ignore accidental large data dumps
+*.csv~
