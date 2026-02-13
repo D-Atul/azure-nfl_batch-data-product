@@ -31,12 +31,11 @@ Six metrics (played games only — both scores present):
 Scheduled/future games (both scores null) are excluded from metric computation.
 
 ---
-
 ## How to Run
 
 This project is executed through an Azure Synapse Pipeline.
 
-The pipeline triggers a Synapse notebook, and the notebook calls the batch runner packaged in:
+The pipeline triggers a Synapse notebook, and the notebook executes the runner packaged in:
 
 ```
 code/azure_batch_code.zip
@@ -52,33 +51,55 @@ code/azure_batch_code.zip
   - `raw/spreadspoke_scores.csv`
   - `code/azure_batch_code.zip`
 
-The zip file must contain the `src/` package (runner, jobs, contracts).
+---
+
+### Step 1 — Notebook Execution Cell
+
+The Synapse notebook contains a single execution cell that loads the code bundle and runs the batch:
+
+```python
+import sys
+
+zip_path = "abfss://data@<batchrawdata>.dfs.core.windows.net/code/azure_batch_code.zip"
+sys.path.insert(0, zip_path)
+
+from src.runner.run_azure_batch import main
+
+sys.argv = [
+    "run_azure_batch",
+    "--input_path", "abfss://data@<batchrawdata>.dfs.core.windows.net/raw/spreadspoke_scores.csv",
+    "--curated_base", "abfss://data@<batchrawdata>.dfs.core.windows.net/curated",
+    "--metrics_base", "abfss://data@<batchrawdata>.dfs.core.windows.net/metrics",
+    "--logs_base", "abfss://data@<batchrawdata>.dfs.core.windows.net/logs",
+]
+
+main()
+```
+
+This cell is the only execution logic.  
+All batch guarantees are enforced inside the runner.
 
 ---
 
-### Run the Batch
+### Step 2 — Trigger the Pipeline
 
 1. Open **Synapse Studio**
 2. Navigate to **Integrate → Pipelines**
 3. Open the batch pipeline
 4. Click **Trigger → Trigger now**
 
-The pipeline will:
+The pipeline:
 
-1. Start a Spark session
-2. Execute the notebook
-3. The notebook imports the runner from `azure_batch_code.zip`
-4. The runner:
-   - Validates the input contract
-   - Writes curated output
-   - Builds M1–M6 metrics
-   - Writes a single `run.log`
+- Starts a Spark session  
+- Executes the notebook  
+- The notebook calls the runner  
+- The runner writes curated data, metrics, and `run.log`  
 
 ---
 
-### Output Location
+### Step 3 — Verify Output
 
-After successful execution, a new `run_id` folder will be created:
+After successful execution, a new run folder will exist:
 
 ```
 curated/run_id=<run_id>/
@@ -92,13 +113,13 @@ Open:
 logs/run_id=<run_id>/run.log
 ```
 
-and confirm:
+Confirm:
 
 ```
 "status": "success"
 ```
 
-If `"status": "failed"`, the `failure_reason` field will explain the failure, and metrics for that run will not remain published.
+If `"status": "failed"`, inspect `"failure_reason"` in the run log.
 
 ---
 
