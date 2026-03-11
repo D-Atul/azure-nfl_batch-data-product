@@ -60,6 +60,7 @@ azure-batch-data-product/
 ├── README.md
 ├── LICENSE
 ├── .gitignore
+├── requirement.txt
 
 ├── data/
 │   └── spreadspoke_scores.csv
