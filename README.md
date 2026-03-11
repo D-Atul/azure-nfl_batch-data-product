@@ -1,61 +1,142 @@
-# Azure Batch Data Product (Synapse Spark)
+# Azure Batch Data Pipeline for Historical NFL Game Analytics
 
-## What this is
+## One-line summary
 
-This is a contract-first Azure batch system built on Synapse Spark.
-
-It reads a historical NFL dataset (`spreadspoke_scores.csv`), validates it strictly, computes six deterministic metrics, and publishes them to ADLS under a run-scoped path.
-
-Each execution produces exactly one run log that serves as the single source of truth.
-
-No streaming.  
-No incremental logic.  
-No enrichment.  
-No hidden mutation.
-
-Just clean, deterministic batch.
+A contract-first Azure batch data pipeline built on Synapse Spark that ingests historical NFL game data, validates it with strict schema contracts, computes deterministic season metrics, and publishes run-scoped outputs to ADLS with a structured execution log.
 
 ---
 
-## What it produces
+## Business / engineering problem
 
-Six metrics (played games only — both scores present):
+Historical sports datasets often contain inconsistent records, missing values, and mixed future and completed events. Without strict validation and deterministic processing, analytics tables built from such data can become unreliable and difficult to reproduce.
 
-- **M1** – Games played per team per season  
-- **M2** – Win / loss / tie counts per team per season  
-- **M3** – Points for and against per team per season  
-- **M4** – Total games per season  
-- **M5** – Regular vs playoff game counts per season  
-- **M6** – Neutral venue game count per season  
+This project solves that problem by implementing a contract-first batch pipeline that:
 
-Scheduled/future games (both scores null) are excluded from metric computation.
+- strictly validates input data before transformation  
+- computes deterministic metrics from completed games only  
+- publishes curated outputs in a run-isolated storage layout  
+- records a structured run log that acts as the single source of truth for execution
+
+The goal is not complex analytics, but reliable, reproducible batch engineering.
 
 ---
-## How to Run
 
-This project is executed through an Azure Synapse Pipeline.
+## Architecture overview
 
-The pipeline triggers a Synapse notebook, and the notebook executes the runner packaged in:
+![Architecture](docs/architecture.png)
+
+Pipeline flow:
+
+Raw CSV input (ADLS)  
+→ contract validation of raw dataset  
+→ transformation into curated dataset  
+→ deterministic metric computation (M1–M6)  
+→ curated and metric tables written to ADLS  
+→ run metadata written to `run.log`  
+→ evidence notebook used for historical verification
+
+The pipeline executes inside **Azure Synapse Spark** and is triggered by a **Synapse pipeline**.
+
+---
+
+## Tech stack
+
+- Python
+- PySpark
+- Azure Synapse Spark
+- Azure Data Lake Storage Gen2
+- Parquet
+- Git / GitHub
+
+Only technologies actually used in the pipeline are listed.
+
+---
+
+## Project structure
 
 ```
+azure-batch-data-product/
+
+├── README.md
+├── LICENSE
+├── .gitignore
+
+├── data/
+│   └── spreadspoke_scores.csv
+
+├── docs/
+│   ├── architecture.png
+│   └── pipeline_flow.png
+
+├── logs/
+│   └── run.log
+
+├── evidence/
+│   └── evidence_notebook.ipynb
+
+├── framework/
+│   └── batch_framework.md
+
+└── src/
+    ├── contracts/
+    │   ├── input_contract.py
+    │   └── output_contracts.py
+    │
+    ├── jobs/
+    │   ├── ingest_validate_transform.py
+    │   └── build_and_publish.py
+    │
+    └── runner/
+        └── run_azure_batch.py
+```
+
+Key directories:
+
+- **src/contracts** — strict input and output schema validation  
+- **src/jobs** — ingestion, transformation, and metric computation  
+- **src/runner** — orchestration logic for the batch run  
+- **logs** — execution metadata (`run.log`)  
+- **docs** — architecture and pipeline diagrams  
+- **evidence** — historical verification notebook  
+
+---
+
+## Key engineering features
+
+This project demonstrates production-minded data pipeline design.
+
+- Contract-first validation before any transformation
+- Explicit separation between ingestion, transformation, and publishing
+- Deterministic batch computation (full recompute each run)
+- Run-scoped output isolation in ADLS
+- Structured run log acting as execution source of truth
+- Failure-safe publishing (metrics removed on failed runs)
+- Evidence-driven verification approach
+
+The system prioritizes clarity, determinism, and reliability over complexity.
+
+---
+
+## How to run
+
+This pipeline executes inside **Azure Synapse**.
+
+### Prerequisites
+
+- Azure Synapse workspace
+- Spark pool available
+- ADLS Gen2 container containing:
+
+```
+raw/spreadspoke_scores.csv
 code/azure_batch_code.zip
 ```
 
 ---
 
-### Prerequisites
+### Step 1 — Synapse notebook execution cell
 
-- Azure Synapse workspace
-- Spark pool available and running
-- ADLS Gen2 container containing:
-  - `raw/spreadspoke_scores.csv`
-  - `code/azure_batch_code.zip`
-
----
-
-### Step 1 — Notebook Execution Cell
-
-The Synapse notebook contains a single execution cell that loads the code bundle and runs the batch:
+The notebook loads the packaged code and invokes the batch runner.
 
 ```python
 import sys
@@ -76,30 +157,30 @@ sys.argv = [
 main()
 ```
 
-This cell is the only execution logic.  
-All batch guarantees are enforced inside the runner.
+The notebook contains only this execution cell.  
+All guarantees are enforced inside the runner.
 
 ---
 
-### Step 2 — Trigger the Pipeline
+### Step 2 — Trigger the Synapse pipeline
 
 1. Open **Synapse Studio**
 2. Navigate to **Integrate → Pipelines**
 3. Open the batch pipeline
 4. Click **Trigger → Trigger now**
 
-The pipeline:
+Execution flow:
 
-- Starts a Spark session  
-- Executes the notebook  
-- The notebook calls the runner  
-- The runner writes curated data, metrics, and `run.log`  
+Synapse Pipeline  
+→ Synapse Notebook  
+→ Batch runner  
+→ ADLS outputs + run log
 
 ---
 
-### Step 3 — Verify Output
+## Storage layout (ADLS Gen2)
 
-After successful execution, a new run folder will exist:
+After a successful run:
 
 ```
 curated/run_id=<run_id>/
@@ -107,66 +188,64 @@ metrics/run_id=<run_id>/M1..M6
 logs/run_id=<run_id>/run.log
 ```
 
-Open:
+Example structure:
 
 ```
+curated/run_id=<run_id>/curated.parquet
+metrics/run_id=<run_id>/M1
+metrics/run_id=<run_id>/M2
+metrics/run_id=<run_id>/M3
+metrics/run_id=<run_id>/M4
+metrics/run_id=<run_id>/M5
+metrics/run_id=<run_id>/M6
 logs/run_id=<run_id>/run.log
 ```
-
-Confirm:
-
-```
-"status": "success"
-```
-
-If `"status": "failed"`, inspect `"failure_reason"` in the run log.
-
----
-
-## Storage layout (ADLS Gen2)
-
-- raw/spreadspoke_scores.csv
-- code/azure_batch_code.zip
-- logs/run_id=b7919d1111974426b23e31ccc0807276/run.log
-- curated/run_id=b7919d1111974426b23e31ccc0807276/curated.parquet/
-  - _SUCCESS+parquet part file
-- metrics/run_id=b7919d1111974426b23e31ccc0807276/
-    - M1/ _SUCCESS + parquet part file
-    - M2/ _SUCCESS + parquet part file
-    - M3/ _SUCCESS + parquet part file
-    - M4/ _SUCCESS + parquet part file
-    - M5/ _SUCCESS + parquet part file
-    - M6/ _SUCCESS + parquet part file
 
 ---
 
 ## Run evidence
 
-Each run produces one file:
+Each batch execution produces a single structured log:
 
-- logs/run_id=<run_id>/run.log
+```
+logs/run_id=<run_id>/run.log
+```
 
-**Structure:**
+Fields include:
 
- - run_id
- - input_path
- - curated_path
- - metrics_root
- - metrics
- - rows_read_raw
- - rows_curated
- - per_metric_rows
- - status
- - failure_reason (if failed)
+- run_id
+- input_path
+- curated_path
+- metrics_root
+- rows_read_raw
+- rows_curated
+- per_metric_rows
+- status
+- failure_reason (if failed)
 
-If status = success, metrics exist.
-If status = failed, metrics were removed.
+Interpretation:
 
+If `"status": "success`  
+→ metrics were published
 
-This file is the single source of truth.
+If `"status": "failed"`  
+→ partial outputs were removed
 
-If it says `status: success`, metrics exist.
-If it says `status: failed`, metrics were removed.
+The run log acts as the authoritative record of pipeline execution.
+
+---
+
+## Evidence notebook
+
+The repository contains a read-only **evidence notebook** used to inspect run artifacts.
+
+Purpose:
+
+- review the committed run log
+- demonstrate how run outputs were inspected
+- document the verification process used during execution
+
+The notebook is preserved as **historical verification evidence**, not as a recomputation environment.
 
 ---
 
@@ -174,22 +253,26 @@ If it says `status: failed`, metrics were removed.
 
 - Contract-first validation
 - Deterministic full recompute batch
-- No deduplication
+- Explicit reconciliation invariants
+- Run-isolated output publishing
 - No enrichment joins
 - No imputation
 - No partial publish
 - Evidence over claims
-- Notebook is read-only review
+
+The system intentionally favors clarity and reliability over complexity.
 
 ---
 
-## What this project demonstrates
+## What this project proves
 
-- Clean cloud batch design
-- Strict data contracts
+This repository demonstrates:
+
+- Azure batch pipeline design
+- Contract-driven data validation
 - Deterministic metric computation
-- Explicit reconciliation invariant
-- Run isolation in ADLS
-- Evidence-driven engineering
+- Run-scoped storage architecture
+- Reproducible batch execution patterns
+- Evidence-driven data engineering practices
 
-It is intentionally small and controlled.
+It represents a small but production-minded cloud batch data pipeline.
