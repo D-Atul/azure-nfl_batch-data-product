@@ -1,5 +1,7 @@
 # Azure Batch Data Pipeline for Historical NFL Game Analytics
 
+![CI](https://github.com/D-Atul/azure-batch-data-product/actions/workflows/ci.yml/badge.svg)
+
 ## One-line summary
 
 A contract-first Azure batch data pipeline built on Synapse Spark that ingests historical NFL game data, validates it with strict schema contracts, computes deterministic season metrics, and publishes run-scoped outputs to ADLS with a structured execution log.
