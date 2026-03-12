@@ -75,7 +75,7 @@ azure-batch-data-product/
 │   └── run.log
 
 ├── evidence/
-│   └── evidence_notebook.ipynb
+│   └── EvidenceNB.ipynb
 
 ├── framework/
 │   └── batch_framework.md
