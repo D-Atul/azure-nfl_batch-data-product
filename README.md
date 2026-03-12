@@ -38,7 +38,7 @@ Raw CSV input (ADLS)
 → evidence notebook used for historical verification
 
 The pipeline executes inside **Azure Synapse Spark** and is triggered by a **Synapse pipeline**.
-
+![Pipeline](docs/pipeline_flow.png)
 ---
 
 ## Tech stack
